@@ -1,17 +1,18 @@
 from flask import Blueprint, request, jsonify
 from database import get_connection
+from psycopg2.extras import RealDictCursor
 
 boletins_bp = Blueprint('boletins', __name__)
 
 @boletins_bp.route('/', methods=['GET'])
 def listar_boletins():
     connection = get_connection()
-    cursor = connection.cursor(dictionary=True)
+    cursor = connection.cursor(cursor_factory=RealDictCursor)
     cursor.execute("""
         SELECT b.id_boletim, b.data, b.total_casos, b.observacoes,
                ag.matricula AS agente_matricula, bai.nome AS bairro
         FROM boletim_diario b
-        JOIN agente_endemias ag ON b.id_agente = ag.id_agente
+        JOIN agente ag ON b.id_agente = ag.idagente
         JOIN bairro bai ON b.id_bairro = bai.id_bairro;
     """)
     boletins = cursor.fetchall()
@@ -22,12 +23,12 @@ def listar_boletins():
 @boletins_bp.route('/<int:id_boletim>', methods=['GET'])
 def obter_boletim(id_boletim):
     connection = get_connection()
-    cursor = connection.cursor(dictionary=True)
+    cursor = connection.cursor(cursor_factory=RealDictCursor)
     cursor.execute("""
         SELECT b.id_boletim, b.data, b.total_casos, b.observacoes,
                ag.matricula AS agente_matricula, bai.nome AS bairro
         FROM boletim_diario b
-        JOIN agente_endemias ag ON b.id_agente = ag.id_agente
+        JOIN agente ag ON b.id_agente = ag.idagente
         JOIN bairro bai ON b.id_bairro = bai.id_bairro
         WHERE b.id_boletim = %s;
     """, (id_boletim,))
@@ -45,10 +46,10 @@ def criar_boletim():
     cursor = connection.cursor()
     cursor.execute("""
         INSERT INTO boletim_diario (id_agente, id_bairro, data, total_casos, observacoes)
-        VALUES (%s, %s, %s, %s, %s);
+        VALUES (%s, %s, %s, %s, %s) RETURNING id_boletim;
     """, (dados['id_agente'], dados['id_bairro'], dados['data'], dados['total_casos'], dados['observacoes']))
+    novo_id = cursor.fetchone()[0]
     connection.commit()
-    novo_id = cursor.lastrowid
     cursor.close()
     connection.close()
     return jsonify({"mensagem": "Boletim criado com sucesso", "id_boletim": novo_id}), 201

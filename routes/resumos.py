@@ -48,36 +48,33 @@ def gerar_resumos_semanais():
         fim_semana = inicio_semana + timedelta(days=6)  # Domingo
         
         cursor.execute("""
+            -- Primeiro deleta resumos existentes para essa semana
+            DELETE FROM resumosemanal WHERE data_inicio = %s;
+            
+            -- Depois insere os novos resumos
             INSERT INTO resumosemanal (
                 data_inicio, data_fim, idagente,
-                total_visitas_semana, total_pontos_criticos_semana,
-                total_criaduros_semana, total_locos_larva_semana,
-                total_locos_positivos_semana, total_adultos_coletados_semana,
-                total_casos_suspeitos_semana
+                total_domicilios_visitados, total_pontos_criticos,
+                total_criaduros_encontrados, total_criaduros_eliminados,
+                total_larvas_encontradas, total_larvas_coletadas,
+                total_adultos_coletados, total_casos_suspeitos
             )
             SELECT 
                 %s as data_inicio,
                 %s as data_fim,
                 idagente,
-                SUM(total_visitas) as total_visitas_semana,
-                SUM(total_pontos_criticos) as total_pontos_criticos_semana,
-                SUM(total_criaduros) as total_criaduros_semana,
-                SUM(total_locos_larva) as total_locos_larva_semana,
-                SUM(total_locos_positivos) as total_locos_positivos_semana,
-                SUM(total_adultos_coletados) as total_adultos_coletados_semana,
-                SUM(total_casos_suspeitos) as total_casos_suspeitos_semana
+                SUM(total_domicilios_visitados) as total_domicilios_visitados,
+                SUM(total_pontos_criticos) as total_pontos_criticos,
+                SUM(total_criaduros_encontrados) as total_criaduros_encontrados,
+                SUM(total_criaduros_eliminados) as total_criaduros_eliminados,
+                SUM(total_larvas_encontradas) as total_larvas_encontradas,
+                SUM(total_larvas_coletadas) as total_larvas_coletadas,
+                SUM(total_adultos_coletados) as total_adultos_coletados,
+                SUM(total_casos_suspeitos) as total_casos_suspeitos
             FROM resumodiario 
             WHERE data BETWEEN %s AND %s
-            GROUP BY idagente
-            ON CONFLICT (data_inicio, idagente) DO UPDATE SET
-                total_visitas_semana = EXCLUDED.total_visitas_semana,
-                total_pontos_criticos_semana = EXCLUDED.total_pontos_criticos_semana,
-                total_criaduros_semana = EXCLUDED.total_criaduros_semana,
-                total_locos_larva_semana = EXCLUDED.total_locos_larva_semana,
-                total_locos_positivos_semana = EXCLUDED.total_locos_positivos_semana,
-                total_adultos_coletados_semana = EXCLUDED.total_adultos_coletados_semana,
-                total_casos_suspeitos_semana = EXCLUDED.total_casos_suspeitos_semana;
-        """, (inicio_semana, fim_semana, inicio_semana, fim_semana))
+            GROUP BY idagente;
+        """, (inicio_semana, inicio_semana, fim_semana, inicio_semana, fim_semana))
         
         connection.commit()
         cursor.close()
@@ -110,6 +107,10 @@ def gerar_resumos_mensais():
             fim_mes = hoje.replace(month=hoje.month + 1, day=1) - timedelta(days=1)
         
         cursor.execute("""
+            -- Primeiro deleta resumos existentes para esse mês
+            DELETE FROM resumomensal WHERE data_inicio = %s;
+            
+            -- Depois insere os novos resumos
             INSERT INTO resumomensal (
                 data_inicio, data_fim, idagente,
                 total_domicilios_visitados_mes, total_pontos_criticos_mes,
@@ -121,27 +122,18 @@ def gerar_resumos_mensais():
                 %s as data_inicio,
                 %s as data_fim,
                 idagente,
-                SUM(total_visitas_semana) as total_domicilios_visitados_mes,
-                SUM(total_pontos_criticos_semana) as total_pontos_criticos_mes,
-                SUM(total_criaduros_semana) as total_criaduros_encontrados_mes,
-                SUM(total_criaduros_semana) as total_criaduros_eliminados_mes,  # Ajuste conforme sua lógica
-                SUM(total_locos_larva_semana) as total_larvas_encontradas_mes,
-                SUM(total_locos_positivos_semana) as total_larvas_coletadas_mes,
-                SUM(total_adultos_coletados_semana) as total_adultos_coletados_mes,
-                SUM(total_casos_suspeitos_semana) as total_casos_suspeitos_mes
+                SUM(total_domicilios_visitados) as total_domicilios_visitados_mes,
+                SUM(total_pontos_criticos) as total_pontos_criticos_mes,
+                SUM(total_criaduros_encontrados) as total_criaduros_encontrados_mes,
+                SUM(total_criaduros_eliminados) as total_criaduros_eliminados_mes,
+                SUM(total_larvas_encontradas) as total_larvas_encontradas_mes,
+                SUM(total_larvas_coletadas) as total_larvas_coletadas_mes,
+                SUM(total_adultos_coletados) as total_adultos_coletados_mes,
+                SUM(total_casos_suspeitos) as total_casos_suspeitos_mes
             FROM resumosemanal 
             WHERE data_inicio BETWEEN %s AND %s
-            GROUP BY idagente
-            ON CONFLICT (data_inicio, idagente) DO UPDATE SET
-                total_domicilios_visitados_mes = EXCLUDED.total_domicilios_visitados_mes,
-                total_pontos_criticos_mes = EXCLUDED.total_pontos_criticos_mes,
-                total_criaduros_encontrados_mes = EXCLUDED.total_criaduros_encontrados_mes,
-                total_criaduros_eliminados_mes = EXCLUDED.total_criaduros_eliminados_mes,
-                total_larvas_encontradas_mes = EXCLUDED.total_larvas_encontradas_mes,
-                total_larvas_coletadas_mes = EXCLUDED.total_larvas_coletadas_mes,
-                total_adultos_coletados_mes = EXCLUDED.total_adultos_coletados_mes,
-                total_casos_suspeitos_mes = EXCLUDED.total_casos_suspeitos_mes;
-        """, (inicio_mes, fim_mes, inicio_mes, fim_mes))
+            GROUP BY idagente;
+        """, (inicio_mes, inicio_mes, fim_mes, inicio_mes, fim_mes))
         
         connection.commit()
         cursor.close()
@@ -162,17 +154,69 @@ def gerar_resumos_mensais():
 def gerar_todos_resumos():
     """Gera todos os resumos (diários, semanais e mensais)"""
     try:
-        # Primeiro gera semanais
-        resultado_semanais = gerar_resumos_semanais()
+        # Gera semanais
+        cursor = get_connection().cursor()
+        hoje = datetime.now().date()
+        inicio_semana = hoje - timedelta(days=hoje.weekday())
+        fim_semana = inicio_semana + timedelta(days=6)
         
-        # Depois gera mensais
-        resultado_mensais = gerar_resumos_mensais()
+        cursor.execute("DELETE FROM resumosemanal WHERE data_inicio = %s", (inicio_semana,))
+        cursor.execute("""
+            INSERT INTO resumosemanal (
+                data_inicio, data_fim, idagente, total_domicilios_visitados,
+                total_pontos_criticos, total_criaduros_encontrados, total_criaduros_eliminados,
+                total_larvas_encontradas, total_larvas_coletadas, total_adultos_coletados,
+                total_casos_suspeitos
+            )
+            SELECT 
+                %s, %s, idagente,
+                SUM(total_domicilios_visitados), SUM(total_pontos_criticos),
+                SUM(total_criaduros_encontrados), SUM(total_criaduros_eliminados),
+                SUM(total_larvas_encontradas), SUM(total_larvas_coletadas),
+                SUM(total_adultos_coletados), SUM(total_casos_suspeitos)
+            FROM resumodiario 
+            WHERE data BETWEEN %s AND %s
+            GROUP BY idagente
+        """, (inicio_semana, fim_semana, inicio_semana, fim_semana))
+        
+        # Gera mensais
+        inicio_mes = hoje.replace(day=1)
+        if hoje.month == 12:
+            fim_mes = hoje.replace(year=hoje.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            fim_mes = hoje.replace(month=hoje.month + 1, day=1) - timedelta(days=1)
+            
+        cursor.execute("DELETE FROM resumomensal WHERE data_inicio = %s", (inicio_mes,))
+        cursor.execute("""
+            INSERT INTO resumomensal (
+                data_inicio, data_fim, idagente, total_domicilios_visitados_mes,
+                total_pontos_criticos_mes, total_criaduros_encontrados_mes, total_criaduros_eliminados_mes,
+                total_larvas_encontradas_mes, total_larvas_coletadas_mes, total_adultos_coletados_mes,
+                total_casos_suspeitos_mes
+            )
+            SELECT 
+                %s, %s, idagente,
+                SUM(total_domicilios_visitados), SUM(total_pontos_criticos),
+                SUM(total_criaduros_encontrados), SUM(total_criaduros_eliminados),
+                SUM(total_larvas_encontradas), SUM(total_larvas_coletadas),
+                SUM(total_adultos_coletados), SUM(total_casos_suspeitos)
+            FROM resumosemanal 
+            WHERE data_inicio BETWEEN %s AND %s
+            GROUP BY idagente
+        """, (inicio_mes, fim_mes, inicio_mes, fim_mes))
+        
+        get_connection().commit()
+        cursor.close()
+        get_connection().close()
         
         return jsonify({
             "mensagem": "Todos os resumos gerados com sucesso",
-            "semanais": resultado_semanais.get_json(),
-            "mensais": resultado_mensais.get_json()
+            "semana": f"{inicio_semana} a {fim_semana}",
+            "mes": inicio_mes.strftime("%B %Y")
         }), 201
         
     except Exception as e:
+        get_connection().rollback()
+        cursor.close()
+        get_connection().close()
         return jsonify({"erro": f"Erro ao gerar todos os resumos: {str(e)}"}), 500

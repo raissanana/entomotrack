@@ -2,12 +2,13 @@ from flask import Blueprint, request, jsonify
 from database import get_connection
 from psycopg2.extras import RealDictCursor
 
-# 1. PRIMEIRO define o Blueprint
-usuarios_bp = Blueprint('usuarios', __name__)
+usuarios_bp = Blueprint("usuarios", __name__)
 
-# 2. DEPOIS define as rotas
-@usuarios_bp.route('/', methods=['GET'])
+@usuarios_bp.route("", methods=["GET", "OPTIONS"])
 def listar_usuarios():
+    if request.method == "OPTIONS":
+        return ("", 200)
+
     connection = get_connection()
     cursor = connection.cursor(cursor_factory=RealDictCursor)
     cursor.execute("SELECT * FROM usuario;")
@@ -16,7 +17,7 @@ def listar_usuarios():
     connection.close()
     return jsonify(usuarios)
 
-@usuarios_bp.route('/<int:id_usuario>', methods=['GET'])
+@usuarios_bp.route("/<int:id_usuario>", methods=["GET"])
 def obter_usuario(id_usuario):
     connection = get_connection()
     cursor = connection.cursor(cursor_factory=RealDictCursor)
@@ -28,8 +29,11 @@ def obter_usuario(id_usuario):
         return jsonify(usuario)
     return jsonify({"erro": "Usuário não encontrado"}), 404
 
-@usuarios_bp.route('/', methods=['POST'])
+@usuarios_bp.route("", methods=["POST", "OPTIONS"])
 def criar_usuario():
+    if request.method == "OPTIONS":
+        return ("", 200)
+
     dados = request.get_json()
     connection = get_connection()
     cursor = connection.cursor()
@@ -39,20 +43,19 @@ def criar_usuario():
         cursor.execute("""
             INSERT INTO usuario (nome, email, senha, funcao, telefone)
             VALUES (%s, %s, %s, %s, %s) RETURNING idusuario;
-        """, (dados['nome'], dados['email'], dados['senha'], dados['funcao'], dados['telefone']))
+        """, (dados['nome'], dados['email'], dados['senha'], dados['funcao'], dados.get('telefone', '')))
         
         novo_id_usuario = cursor.fetchone()[0]
         
         # 2. Se for agente, cria automaticamente na tabela agente
         if dados['funcao'] == 'agente':
-            # Verifica se a matrícula foi fornecida
             if 'matricula' not in dados:
                 connection.rollback()
                 cursor.close()
                 connection.close()
                 return jsonify({"erro": "Matrícula é obrigatória para agentes"}), 400
                 
-            quartelaria = dados.get('quartelaria', 100)  # Padrão 100 se não informado
+            quartelaria = dados.get('quartelaria', 100)
             
             cursor.execute("""
                 INSERT INTO agente (quartelaria, matricula, idusuario) 
@@ -60,9 +63,7 @@ def criar_usuario():
             """, (quartelaria, dados['matricula'], novo_id_usuario))
             id_agente = cursor.fetchone()[0]
             
-        # 3. Se for supervisor, cria automaticamente na tabela supervisor
         elif dados['funcao'] == 'supervisor':
-            # Verifica se a matrícula foi fornecida
             if 'matricula' not in dados:
                 connection.rollback()
                 cursor.close()
@@ -82,7 +83,6 @@ def criar_usuario():
             "id_usuario": novo_id_usuario
         }
         
-        # Adiciona info extra se for agente ou supervisor
         if dados['funcao'] == 'agente':
             resposta["id_agente"] = id_agente
             resposta["matricula"] = dados['matricula']
@@ -100,7 +100,7 @@ def criar_usuario():
         connection.close()
         return jsonify({"erro": f"Erro ao criar usuário: {str(e)}"}), 500
 
-@usuarios_bp.route('/<int:id_usuario>', methods=['PUT'])
+@usuarios_bp.route("/<int:id_usuario>", methods=["PUT"])
 def atualizar_usuario(id_usuario):
     dados = request.get_json()
     connection = get_connection()
@@ -109,13 +109,13 @@ def atualizar_usuario(id_usuario):
         UPDATE usuario
         SET nome=%s, email=%s, senha=%s, funcao=%s, telefone=%s
         WHERE idusuario=%s;
-    """, (dados['nome'], dados['email'], dados['senha'], dados['funcao'], dados['telefone'], id_usuario))
+    """, (dados['nome'], dados['email'], dados['senha'], dados['funcao'], dados.get('telefone', ''), id_usuario))
     connection.commit()
     cursor.close()
     connection.close()
     return jsonify({"mensagem": "Usuário atualizado com sucesso"})
 
-@usuarios_bp.route('/<int:id_usuario>', methods=['DELETE'])
+@usuarios_bp.route("/<int:id_usuario>", methods=["DELETE"])
 def deletar_usuario(id_usuario):
     connection = get_connection()
     cursor = connection.cursor()

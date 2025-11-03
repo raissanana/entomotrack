@@ -1,16 +1,18 @@
 import os
 import psycopg2
-from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 
 load_dotenv()
 
 def get_connection():
+    """
+    Retorna uma conexão psycopg2 ou None em caso de falha.
+    Use com cuidado: sempre feche a conexão após uso.
+    """
     try:
-        # Pega a string de conexão do Neon do arquivo .env
         database_url = os.getenv('DATABASE_URL')
-        
-        # Conecta ao PostgreSQL
+        if not database_url:
+            raise ValueError("DATABASE_URL não definido no .env")
         connection = psycopg2.connect(database_url)
         return connection
     except Exception as e:

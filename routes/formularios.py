@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from database import get_connection
 from psycopg2.extras import RealDictCursor
+from datetime import datetime
 
 formularios_bp = Blueprint('formularios', __name__)
 
@@ -61,7 +62,36 @@ def criar_formulario():
     cursor = connection.cursor()
     
     try:
-        # 1. Insere o formulário
+        # Processar timestamps automáticos do frontend
+        timestamp_inicio = dados.get('timestamp_inicio')
+        timestamp_fim = dados.get('timestamp_fim')
+        
+        # Extrair apenas a hora dos timestamps (HH:MM)
+        hora_inicio = None
+        hora_saida = None
+        
+        if timestamp_inicio:
+            try:
+                # Converte timestamp para objeto datetime e extrai hora
+                dt_inicio = datetime.fromisoformat(timestamp_inicio.replace('Z', '+00:00'))
+                hora_inicio = dt_inicio.strftime('%H:%M')
+            except:
+                hora_inicio = dados.get('hora_inicio')
+        
+        if timestamp_fim:
+            try:
+                dt_fim = datetime.fromisoformat(timestamp_fim.replace('Z', '+00:00'))
+                hora_saida = dt_fim.strftime('%H:%M')
+            except:
+                hora_saida = dados.get('hora_saida')
+        
+        # Usar horários fornecidos se os timestamps não estiverem disponíveis
+        if not hora_inicio:
+            hora_inicio = dados.get('hora_inicio')
+        if not hora_saida:
+            hora_saida = dados.get('hora_saida')
+
+        # 1. Insere o formulário com timestamps
         cursor.execute("""
             INSERT INTO formularioporcasa (
                 data, bairro, endereco, tipo_inseto, hora_inicio, hora_saida,
@@ -69,21 +99,28 @@ def criar_formulario():
                 num_locos_larva, num_locos_positivos, num_adultos_encontrados,
                 num_adultos_coletados, acaorealizada, inseticida_usado,
                 quantidade_inseticida, casos_suspeitos, nome_pessoa,
-                telefone_pessoa, observacoes, idagente
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                telefone_pessoa, observacoes, idagente,
+                timestamp_inicio, timestamp_fim, geolocalizacao
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING idboletimdiario;
         """, (
             dados['data'], dados['bairro'], dados['endereco'], dados['tipo_inseto'],
-            dados['hora_inicio'], dados['hora_saida'], dados['num_pontos_criticos'],
-            dados['total_criaduros_encontrados'], dados['criaduros_eliminados'], dados['tipos_criaduros'],
-            dados['num_locos_larva'], dados['num_locos_positivos'], dados['num_adultos_encontrados'],
-            dados['num_adultos_coletados'], dados['acaorealizada'], dados['inseticida_usado'],
-            dados['quantidade_inseticida'], dados['casos_suspeitos'], dados['nome_pessoa'],
-            dados['telefone_pessoa'], dados['observacoes'], dados['idagente']
+            hora_inicio, hora_saida,
+            dados['num_pontos_criticos'], dados['total_criaduros_encontrados'], 
+            dados['criaduros_eliminados'], dados['tipos_criaduros'],
+            dados['num_locos_larva'], dados['num_locos_positivos'], 
+            dados['num_adultos_encontrados'], dados['num_adultos_coletados'],
+            dados['acaorealizada'], dados['inseticida_usado'],
+            dados['quantidade_inseticida'], dados['casos_suspeitos'], 
+            dados['nome_pessoa'], dados['telefone_pessoa'], 
+            dados['observacoes'], dados['idagente'],
+            timestamp_inicio,  # Timestamp completo ISO
+            timestamp_fim,     # Timestamp completo ISO
+            dados.get('geolocalizacao')  # { "lat": -23.5, "lng": -46.6 }
         ))
         novo_id = cursor.fetchone()[0]
         
-        # 2. ATUALIZA AUTOMATICAMENTE O RESUMO DIÁRIO (SEM ON CONFLICT)
+        # 2. ATUALIZA AUTOMATICAMENTE O RESUMO DIÁRIO
         cursor.execute("""
             -- Primeiro deleta se já existir resumo para essa data e agente
             DELETE FROM resumodiario 
@@ -116,7 +153,8 @@ def criar_formulario():
         return jsonify({
             "mensagem": "Formulário criado com sucesso", 
             "id_formulario": novo_id,
-            "resumo_atualizado": True
+            "resumo_atualizado": True,
+            "timestamps_capturados": bool(timestamp_inicio and timestamp_fim)
         }), 201
         
     except Exception as e:

@@ -75,8 +75,8 @@ def criar_formulario():
     if not conn:
         return jsonify({"success": False, "erro": "Erro ao conectar ao banco"}), 500
 
-    # validação básica requerida
-    required = ["data", "idagente", "bairro", "endereco", "tipo_inseto"]
+    # validação básica requerida (removidos endereço e bairro)
+    required = ["data", "idagente", "tipo_inseto", "geolocalizacao"]
     erros_campo = {}
     for campo in required:
         if not dados.get(campo):
@@ -114,17 +114,17 @@ def criar_formulario():
         with conn.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO formularioporcasa (
-                    data, bairro, endereco, tipo_inseto, hora_inicio, hora_saida,
+                    data, tipo_inseto, hora_inicio, hora_saida,
                     num_pontos_criticos, total_criaduros_encontrados, criaduros_eliminados, tipos_criaduros,
                     num_locos_larva, num_locos_positivos, num_adultos_encontrados,
                     num_adultos_coletados, acaorealizada, inseticida_usado,
                     quantidade_inseticida, casos_suspeitos, nome_pessoa,
                     telefone_pessoa, observacoes, idagente,
                     timestamp_inicio, timestamp_fim, geolocalizacao
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING idboletimdiario;
             """, (
-                dados.get('data'), dados.get('bairro'), dados.get('endereco'), dados.get('tipo_inseto'),
+                dados.get('data'), dados.get('tipo_inseto'),
                 hora_inicio, hora_saida,
                 dados.get('num_pontos_criticos'), dados.get('total_criaduros_encontrados'),
                 dados.get('criaduros_eliminados'), dados.get('tipos_criaduros'),

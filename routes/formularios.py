@@ -75,8 +75,8 @@ def criar_formulario():
     if not conn:
         return jsonify({"success": False, "erro": "Erro ao conectar ao banco"}), 500
 
-    # validação básica requerida (removidos endereço e bairro)
-    required = ["data", "idagente", "tipo_inseto", "geolocalizacao"]
+    # validação básica requerida
+    required = ["data", "idagente", "tipo_inseto"]
     erros_campo = {}
     for campo in required:
         if not dados.get(campo):
@@ -85,56 +85,51 @@ def criar_formulario():
         conn.close()
         return jsonify({"success": False, "errors": erros_campo}), 400
 
-    # tenta extrair horas a partir de timestamps
-    timestamp_inicio = dados.get('timestamp_inicio')
-    timestamp_fim = dados.get('timestamp_fim')
-    hora_inicio = None
-    hora_saida = None
+    # CORREÇÃO CRÍTICA: Converter strings vazias para None nos campos de hora
+    hora_inicio = dados.get('hora_inicio')
+    hora_saida = dados.get('hora_saida')
 
-    if timestamp_inicio:
-        try:
-            dt_inicio = datetime.fromisoformat(timestamp_inicio.replace('Z', '+00:00'))
-            hora_inicio = dt_inicio.strftime('%H:%M')
-        except Exception:
-            hora_inicio = dados.get('hora_inicio')
-
-    if timestamp_fim:
-        try:
-            dt_fim = datetime.fromisoformat(timestamp_fim.replace('Z', '+00:00'))
-            hora_saida = dt_fim.strftime('%H:%M')
-        except Exception:
-            hora_saida = dados.get('hora_saida')
-
-    if not hora_inicio:
-        hora_inicio = dados.get('hora_inicio')
-    if not hora_saida:
-        hora_saida = dados.get('hora_saida')
+    # Se for string vazia, converter para None (NULL no banco)
+    if hora_inicio == "":
+        hora_inicio = None
+    if hora_saida == "":
+        hora_saida = None
 
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO formularioporcasa (
-                    data, tipo_inseto, hora_inicio, hora_saida,
+                    data, bairro, endereco, tipo_inseto, hora_inicio, hora_saida,
                     num_pontos_criticos, total_criaduros_encontrados, criaduros_eliminados, tipos_criaduros,
                     num_locos_larva, num_locos_positivos, num_adultos_encontrados,
                     num_adultos_coletados, acaorealizada, inseticida_usado,
                     quantidade_inseticida, casos_suspeitos, nome_pessoa,
-                    telefone_pessoa, observacoes, idagente,
-                    timestamp_inicio, timestamp_fim, geolocalizacao
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    telefone_pessoa, observacoes, idagente
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING idboletimdiario;
             """, (
-                dados.get('data'), dados.get('tipo_inseto'),
-                hora_inicio, hora_saida,
-                dados.get('num_pontos_criticos'), dados.get('total_criaduros_encontrados'),
-                dados.get('criaduros_eliminados'), dados.get('tipos_criaduros'),
-                dados.get('num_locos_larva'), dados.get('num_locos_positivos'),
-                dados.get('num_adultos_encontrados'), dados.get('num_adultos_coletados'),
-                dados.get('acaorealizada'), dados.get('inseticida_usado'),
-                dados.get('quantidade_inseticida'), dados.get('casos_suspeitos'),
-                dados.get('nome_pessoa'), dados.get('telefone_pessoa'),
-                dados.get('observacoes'), dados.get('idagente'),
-                timestamp_inicio, timestamp_fim, dados.get('geolocalizacao')
+                dados.get('data'), 
+                dados.get('bairro', ''),
+                dados.get('endereco', ''),
+                dados.get('tipo_inseto'),
+                hora_inicio,  # Agora pode ser None em vez de string vazia
+                hora_saida,   # Agora pode ser None em vez de string vazia
+                dados.get('num_pontos_criticos', 0),
+                dados.get('total_criaduros_encontrados', 0),
+                dados.get('criaduros_eliminados', 0),
+                dados.get('tipos_criaduros', ''),
+                dados.get('num_locos_larva', 0),
+                dados.get('num_locos_positivos', 0),
+                dados.get('num_adultos_encontrados', 0),
+                dados.get('num_adultos_coletados', 0),
+                dados.get('acaorealizada', ''),
+                dados.get('inseticida_usado', ''),
+                dados.get('quantidade_inseticida', ''),
+                dados.get('casos_suspeitos', 0),
+                dados.get('nome_pessoa', ''),
+                dados.get('telefone_pessoa', ''),
+                dados.get('observacoes', ''),
+                dados.get('idagente')
             ))
             novo_id = cursor.fetchone()[0]
 
@@ -168,8 +163,7 @@ def criar_formulario():
             "success": True,
             "mensagem": "Formulário criado com sucesso",
             "id_formulario": novo_id,
-            "resumo_atualizado": True,
-            "timestamps_capturados": bool(timestamp_inicio and timestamp_fim)
+            "resumo_atualizado": True
         }), 201
 
     except Exception as e:

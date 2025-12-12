@@ -13,7 +13,7 @@ app.url_map.strict_slashes = False
 # Configura CORS explicitamente (permitir seu frontend)
 CORS(
     app,
-    origins=["http://localhost:5173"],  # ajuste se precisar de mais origins
+    origins=["http://localhost:5173", os.environ.get("FRONTEND_URL", "https://entomo-track-frontend.vercel.app")],  # ajuste se precisar de mais origins
     supports_credentials=True,
     allow_headers=["Content-Type", "Authorization", "Accept", "X-Requested-With"],
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
